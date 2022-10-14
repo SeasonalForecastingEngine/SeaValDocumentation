@@ -1,4 +1,3 @@
-# Data import and processing
 
 ```{r setup, echo = F, message = F}
 knitr::opts_chunk$set(fig.width = 5)
@@ -11,13 +10,13 @@ load(file = '_data_dir.RData')
 
 
 
-## Reshaping data {#data-examples}
+# Reshaping data {#data-examples}
 
 For forecast validation, the ideal data format is to have all your fore- and hindcasts in the same data table, alongside the corresponding observations. So one column of forecasts, one column of observations and several columns of dimension variables (e.g. year, month, lon,lat). However, this is rarely how your netcdf-data looks like: you'll often have different netcdfs for observations and fore-/hindcasts. They might, moreover have different units, different missing values, different variable names etc.
 
 So to get your data into the preferred shape, you either need to manipulate the netcdf files beforehand, to get exactly the data table you want from `netcdf_to_dt`, or you can extract several data tables and do the required manipulations in `R`, using `SeaVal` and `data.table`. In this section we show a few examples how to do this.
 
-### Example: cross-validation data {#cv-data}
+### Example 1: cross-validation data {#cv-data}
 
 We first consider a crossvalidation dataset, containing predictions for the February-April rainfall. 
 
@@ -73,7 +72,7 @@ dt_cv = copy(dt)
 ```
 
 
-### Example: Tercile forecasts and upscaling {#us-obs}
+### Example 2: Tercile forecasts and upscaling {#us-obs}
 
 In the first example we were lucky that our observations and predictions were of the same format, which is not always the case. We will now look at a more complex example where we prepare a typical tercile forecast for precipitation. We consider again the 2021 MAM season as example. Let's get started with collecting the prediction and corresponding observations:
 

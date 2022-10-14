@@ -4,7 +4,7 @@ title: |
   ![](logo_CONFER.png){width=2in}  
   The `SeaVal` package for validating seasonal weather forecasts
 author:
-  - Claudio Heinrich and Michael Scheuerer, with input from
+  - Claudio Heinrich, Céline Cunen and Michael Scheuerer, with input from
   - Masilin Gudoshava, Eunice Koech, Anthony Mwanthi, Zewdu Segele, Hussen Seid and Thordis Thorarinsdottir 
 
 output: html_document
@@ -78,6 +78,15 @@ library(SeaVal)
 
 ```
 ## Loading required package: ForecastTools
+```
+
+```
+## Loading required package: ggplot2
+```
+
+```
+## Bioconductor version '3.12' is out-of-date; the current release version '3.15'
+##   is available with R version '4.2'; see https://bioconductor.org/install
 ```
 
 <!-- Especially in the early development phase, it is important to occasionally update the `SeaVal` package. To this end simply run the following commands every now and then: -->

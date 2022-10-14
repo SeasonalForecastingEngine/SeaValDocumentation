@@ -4,7 +4,7 @@ title: |
   ![](logo_CONFER.png){width=2in}  
   The `SeaVal` package for validating seasonal weather forecasts
 author:
-  - Claudio Heinrich and Michael Scheuerer, with input from
+  - Claudio Heinrich, Céline Cunen and Michael Scheuerer, with input from
   - Masilin Gudoshava, Eunice Koech, Anthony Mwanthi, Zewdu Segele, Hussen Seid and Thordis Thorarinsdottir 
 
 output: html_document
@@ -13,7 +13,7 @@ output: html_document
 
 # Introduction {-}
     
-The `R`-package `SeaVal` provides functionality and many useful tools for evaluating seasonal forecasts. It is developed by the [Norwegian Computing Center](https://nr.no/en/) as part of the Horizon 2020 project [CONFER](https://confer-h2020.eu/). The goal of this project is to improve seasonal weather predictions in east Africa. Some functionality of this package is tailored to this purpose, specifically to evaluation practice and datasets at [ICPAC](https://www.icpac.net/), while other will be useful for evaluating seasonal predictions in general.
+The `R`-package `SeaVal` provides functionality and many useful tools for evaluating seasonal forecasts. It is developed by the [Norwegian Computing Center](https://nr.no/en/) as part of the Horizon 2020 project [CONFER](https://confer-h2020.eu/). The goal of this project is to improve seasonal weather predictions in east Africa. Some functionality of this package is tailored to this purpose, specifically to evaluation practice and datasets at [ICPAC](https://www.icpac.net/), while other will be useful for evaluating seasonal predictions in general. The package mostly follows the [WMO recommendations on evaluating seasonal weather forecasts](https://library.wmo.int/index.php?lvl=notice_display&id=20618), and provides implementations for all evaluation metrics recommended there.
 
 Evaluating seasonal weather predictions requires an entire pipeline of tasks, including
 
@@ -50,7 +50,8 @@ install.packages('devtools')
 ```
 
 Thereafter, the `SeaVal` package including all dependencies can be installed by running the command 
-```
+<!-- We don't evaluate this in order to simplify working with the development version of SeaVal for documentation. Just check that your installation is up to date before you work on the documentation -->
+```{r eval = FALSE, echo = TRUE} 
 devtools::install_github('SeasonalForecastingEngine/SeaVal')
 ```
 
@@ -67,8 +68,7 @@ Which would you like to update?
 ...
 ```
 
-In that case type '1' for all. *(It is important to not only update CRAN packages: for technical reasons, the `SeaVal` package depends on a second package `ForecastTools` hosted on github, which is also developed by the Norwegian Computing Center)*
-
+In that case type '1' for all. 
 If this completes without an error, the setup is complete and you're good to go.
 Now, all you have to do is load `SeaVal`:
 
@@ -88,7 +88,7 @@ The rest of the tutorial is organized as follows. We will first give a few examp
 
 Here, we show some examples of basic operations on data tables. 
 A short but comprehensive introduction to `data.table`s syntax can be found [here](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html).
-The `SeaVal` package comes with a few example data sets we will use here, for example monthly mean precipitation over the GHA region for the OND season provided by CHIRPS:
+The `SeaVal` package comes with two example data sets for highlighting functionality. The first one contains monthly mean precipitation over the GHA region for the OND season provided by CHIRPS:
 
 ```{r}
 data("chirps_monthly")
@@ -101,7 +101,7 @@ A short description of the dataset is also provided:
 ?chirps_monthly
 ```
 
-We'll now go over a few basic commands for handling this sort of data. `chirps_monthly` is a data table, which is an enhanced data frame. The most fundamental operations include subsetting, performing calculations on columns and aggregation or grouping for calculations. Examples for subsetting are
+`chirps_monthly` is a data table, which is an enhanced data frame. Most operations available for data frames can typically be directly applied to data tables. The data table package moreover provides simplified notation for fundamental operations, such as subsetting, performing calculations on columns and aggregation or grouping for calculations. Examples for subsetting are
 ```{r}
 chirps_monthly[month == 10] # extract the data for October
 chirps_monthly[year %between% c(1990,1999)] # extract the data for 1990 - 1999
@@ -109,7 +109,7 @@ chirps_monthly[1000:2000] # extract rows 1000 - 2000
 chirps_monthly[month == 10][lon > 30][terc_cat == 0] #chained subsetting: get all October values at locations with longitude >30 that had normal rainfall (terc_cat == 0)
 chirps_monthly[month == 10 & lon > 30 & terc_cat == 0] # different syntax, same effect.
 ```
-We can subset either by logical expressions (first two examples) or by row indices (third example). Subsetting always returns a data table, e.g. `chirps_monthly[1]` returns a one-row data table containing the first row of `chirps_monthly`. 
+We can subset either by row indices (third example) or by logical expressions (all other examples). Subsetting always returns a data table, e.g. `chirps_monthly[1]` returns a one-row data table containing the first row of `chirps_monthly`. 
 
 Next, let's look at examples for operations on columns:
 ```{r}

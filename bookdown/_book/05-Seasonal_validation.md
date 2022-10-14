@@ -3,275 +3,49 @@
 
 
 
-In this section we look into validating different types of predictions. Our focus herby lies on proper scoring rules, as well as skill scores for comparison to climatology. 
-
-## Evaluating cross-validation predictions {#cv-eval}
-
-Here we evaluate the cross-validation data prepared in Section \@ref(cv-data).
-The data table contains observations for past years for the FMA season, along with 'best-guess'-predictions, meaning that they are single numbers, not probabilities:
-
-```r
-print(dt_cv)
-```
-
-```
-##         lon   lat prediction observation year month
-##     1: 20.5 -11.5  316.19452   369.36932 1982     2
-##     2: 20.5 -11.5  316.20178   252.47144 1983     2
-##     3: 20.5 -11.5  317.43375   267.44031 1984     2
-##     4: 20.5 -11.5  313.30789   332.10236 1985     2
-##     5: 20.5 -11.5  318.12195   343.65460 1986     2
-##    ---                                             
-## 79745: 51.5  22.5   25.44651    19.71902 2012     2
-## 79746: 51.5  22.5   25.59836    27.55773 2013     2
-## 79747: 51.5  22.5   26.03941    25.14965 2014     2
-## 79748: 51.5  22.5   26.03053    22.23634 2015     2
-## 79749: 51.5  22.5   26.00327    34.84376 2016     2
-```
-Such predictions are often called *point forecasts*, whereas forecasts specifying probabilities are called *probabilistic*. 
-We already have the data in the shape we want it to be, containing both predictions and observations as one column each. Let's have a look at the bias in our predictions:
-
-
-```r
-### check out local biases:
-bias_dt = dt_cv[,.(bias = mean(prediction - observation)), by = .(lon,lat)] # grouping by lon,lat, and season means that the mean is taken over all years.
-bias_dt[,range(bias)] # get an idea of the range for plotting
-```
-
-```
-## [1] -10.81321  13.11778
-```
-
-```r
-rr = c(-15,15) # fix range, to make plots comparable
-
- ggplot_dt(bias_dt,
-           data_col = 'bias', 
-           rr = rr, # fix range to make it comparable to pp2
-           mn = 'bias of FMA prediction',
-           midpoint = 0)
-```
-
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-2-1.png" width="960" />
-
-For evaluating the locally varying skill of these predictions we can calculate the average square error per location and compare it to the square error we would get by predicting local climatology, i.e., just the mean precipitation for that location. This is called the mean square error skill score (MSES) and is calculated by the function `MSES`.
-For fair comparison, the climatology needs to be calculated leave-one-year-out: For example, a climatological prediction for 2021 prediction would be the mean precipitation over all years *except 2021*. Otherwise, the climatological forecast uses information that would not be available in a prediction setting, which inflates the skill of the climatology forecast. 
-
-
-
-```r
-### analyze mean square error skill scores
-msess = MSES(dt_cv,
-             f = 'prediction', # column name of forecasts
-             o = 'observation', # column name of observations
-             by = c('lon','lat')) # the skill scores should be computed for each location separately
-
-# plot results:
-ggplot_dt(msess,
-          data_col = 'MSES', 
-          midpoint = 0, # center color scale, white is 0
-          mn = 'MSE skill score, FMA')
-```
-
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-3-1.png" width="960" />
-As for all skill scores, positive values indicate that the prediction has higher skill than climatology, negative values indicates lower skill. Skill scores are moreover 'standardized' such that a score of 1 corresponds to a perfect forecast. 
-Most evaluation functions in `SeaVal` require similar input as `MSES`:
-* `dt`: a data table containing both observations and predictions.
-* `f`,`o`: the column names of the predictions and observation.
-* `by`: the column names for dimension variables to group by.
-[Add more context here]
-Note that there is also a (faster) function `MSE` if we're not interested in skill scores, but simply want to compute MSEs. Both function can also handle ensemble predictions, see function documentation.
-If we want to analyze results by countries, we can use the function `add_country_names` that adds a column with country names to the data table:
-
-
-```r
-# check out average MSEs and MSESSs per country:
-msess = add_country_names(msess)
-print(msess)
-```
-
-```
-##        lon  lat       MSE  clim_MSE          MSES     country
-##    1: 24.5  8.5 166.01823 160.95057 -0.0314858375 South Sudan
-##    2: 25.0  8.0 157.70201 155.21241 -0.0160399415 South Sudan
-##    3: 25.0  8.5 184.12923 175.97631 -0.0463296523 South Sudan
-##    4: 25.5  7.5 318.41059 315.81470 -0.0082196638 South Sudan
-##    5: 25.5  8.0 189.80862 189.96845  0.0008413415 South Sudan
-##   ---                                                        
-## 1231: 48.5 11.0  68.40813  72.26785  0.0534084478     Somalia
-## 1232: 49.0  6.5 202.11711 216.18040  0.0650534734     Somalia
-## 1233: 49.0  7.0 153.96742 162.97361  0.0552616643     Somalia
-## 1234: 49.5 11.0  74.21040  76.48522  0.0297419712     Somalia
-## 1235: 50.0 11.0 181.27647 184.42122  0.0170519749     Somalia
-```
-
-```r
-msess_by_country = msess[,.(MSE = mean(MSE),
-                            MSES = mean(MSES)), by = country] # take averages by country
-
-print(msess_by_country)
-```
-
-```
-##         country       MSE         MSES
-##  1: South Sudan  622.6657  0.029073419
-##  2:      Rwanda 1695.8937  0.130467978
-##  3:    Tanzania 4011.6931  0.030148166
-##  4:     Burundi 2195.6404  0.109954193
-##  5:      Uganda 1369.9684  0.062205385
-##  6:    Ethiopia 1557.5682  0.068145290
-##  7:       Kenya 2173.5858  0.066719651
-##  8:       Sudan  216.8926 -0.021270474
-##  9:     Eritrea  393.7713  0.007646318
-## 10:     Somalia 1183.0632  0.040397831
-## 11:    Djibouti  121.1750  0.078021693
-```
-
-
-Skill scores strongly depend on the skill of the climatological prediction, see Section \@ref(eval-ex-pr). This makes it somewhat problematic to average them in space, as skill scores for different grid points with different climatologies have different meanings. A more appropriate way to see whether the prediction outperformed climatology on average for a given country is by considering average score differences:
-
-
-```r
-# positive values indicate better performance than climatology:
-msess[,.(score_diff = mean(clim_MSE - MSE)),by = country]
-```
-
-```
-##         country score_diff
-##  1: South Sudan  27.289033
-##  2:      Rwanda 283.252101
-##  3:    Tanzania  82.175135
-##  4:     Burundi 273.488506
-##  5:      Uganda  89.460627
-##  6:    Ethiopia 131.532177
-##  7:       Kenya 166.101084
-##  8:       Sudan  -4.517323
-##  9:     Eritrea  -5.201654
-## 10:     Somalia  58.001462
-## 11:    Djibouti  11.940107
-```
-
-The MSE (and its associated skill score) penalizes both systematic forecast errors (i.e. biases) and non-systematic forecast errors. The latter are a consequence of general forecast uncertainty and there is no easy way to reduce them. Biases, however, can often be removed through statistical post-processing, and it is therefore interesting to consider measures for forecast performance that penalize only non-systematic forecast errors, thus giving an idea of the *potential skill* of a forecast system.
-
-The standard metric to assess the *potential skill* is the *Pearson correlation coefficient (PCC)*. This is the usual correlation coefficient where forecasts and observations are standardized by their respective climatological means and standard deviations, and then the average product of these standardized variables is calculated. The function `PCC` performs these calculations and is used in the same way as `MSES` above.
-
-
-```r
-### calculate Pearson correlation coefficients
-pcc = PCC(dt_cv,
-          f = 'prediction', # column name of forecasts
-          o = 'observation', # column name of observations
-          by = c('lon','lat')) # the correlation coefficient should be computed for each location separately
-
-# the maximal range for a correlation coefficient is [-1,1], but sometimes it is useful to narrow it:
-rr = c(-0.75,0.75)
-
-ggplot_dt(pcc,
-          data_col = 'rho', 
-          rr=rr,
-          mn = 'Pearson correlation coefficient, FMA')
-```
-
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-6-1.png" width="960" />
-
-
-While there is no technical requirement that the forecasts and observations follow a particular probability distribution when the Pearson correlation coefficient is employed, this metric is best suited for continuous distributions (i.e. it is unlikely to encounter duplicate values) that are relatively symmetric around the mean. For shorter (e.g. weekly) accumulation periods and in dry climates, the distribution of precipitation usually becomes rather skewed and contains a number of zeros. A new metric, the coefficient of predictive ability (CPA), has recently been developed and constitutes an excellent alternative to the PCC as a measure of potential forecast skill in that situation of strongly asymmetric distributions with multiple identical values. See [here](MotivationCPA.pdf) for more background information about the CPA. The function `CPA` performs the calculations and is used in the same way as `MSES` and `PCC` above.
-
-
-```r
-### calculate coefficient of predictive ability
-cpa = CPA(dt_cv,
-          f = 'prediction', # column name of forecasts
-          o = 'observation', # column name of observations
-          by = c('lon','lat')) # the CPA should be computed for each location separately
-
-# the maximal range for the CPA is [0,1]
-# a value of 0.5 corresponds to no skill (more details can be found in the document under the link given above) 
-rr = c(0,1)
-
-ggplot_dt(cpa, 
-          data_col = 'cpa', 
-          rr=rr,
-          mn = 'Coefficient of predictive ability, FMA')
-```
-
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-7-1.png" width="960" />
-
-Just like the MSES, PCC and CPA can be averaged by country using the function `add_country_names`:
-
-
-```r
-# check out average PCCs and CPAs per country:
-pcc = add_country_names(pcc)
-cpa = add_country_names(cpa)
-
-pcc_by_country = pcc[,.(rho = mean(rho)), by = country]
-cpa_by_country = cpa[,.(cpa = mean(cpa)), by = country]
-
-print(pcc_by_country)
-```
-
-```
-##         country          rho
-##  1: South Sudan -0.131322590
-##  2:      Rwanda  0.304516201
-##  3:    Tanzania -0.102200872
-##  4:     Burundi  0.230229774
-##  5:      Uganda  0.087081218
-##  6:    Ethiopia  0.068491179
-##  7:       Kenya  0.100172850
-##  8:       Sudan -0.328970736
-##  9:     Eritrea -0.169954159
-## 10:     Somalia  0.003777202
-## 11:    Djibouti  0.194408707
-```
-
-```r
-print(cpa_by_country)
-```
-
-```
-##         country       cpa
-##  1: South Sudan 0.4362882
-##  2:      Rwanda 0.6468312
-##  3:    Tanzania 0.4564792
-##  4:     Burundi 0.6117025
-##  5:      Uganda 0.5372199
-##  6:    Ethiopia 0.5428733
-##  7:       Kenya 0.5474916
-##  8:       Sudan 0.3812325
-##  9:     Eritrea 0.4131719
-## 10:     Somalia 0.5254189
-## 11:    Djibouti 0.6097689
-```
+In this section we give examples how to evaluate seasonal forecasts with SeaVal. One of the key tasks addressed by `SeaVal` is the evaluation of tercile probability forecasts, but also other forecast types are supported. We recommend to read the [WMO recommendations on evaluating Seasonal Climate Forecasts](https://library.wmo.int/doc_num.php?explnum_id=4886), which discusses in detail aspects of evaluating tercile forecasts.
 
 
 ## Evaluating Tercile Forecasts
 
-Next, we'll turn our attention to one of the main products disseminated at GHACOFs, the probabilistic forecasts whether the coming season will see a below normal-, normal-, or above normal amount of rainfall. Since these three categories are defined by climatological terciles, we call them tercile forecasts. From an evaluation perspective, there are two different scenarios: Either we get the prediction as a vector of three probabilities, or we just get the probability for the most likely category. Evaluating a vector of three probabilities is preferrable, because it conveys more detailed information about the forecast: Say, for example, two competing models predicted the probabilities (0.5, 0.3, 0.2) and (0.5, 0.49, 0.01), respectively (in the order below, normal, high). Say now, after observing the predicted season, it turns out that the rainfall was in fact above normal. In this case, both predictions were pretty bad, but the first model at least assigned a 20% chance to above-normal-rainfall, whereas the second model only assigned a 1% chance to that outcome. So the first prediction was substantially better. However, if we only look at the category with the highest predicted probability, the two models can't be distinguished, as they both appear as (0.5,-,-).
+One of the main products disseminated at GHACOFs are probabilistic forecasts whether the coming season will see a below normal-, normal-, or above normal amount of rainfall. 
+These three categories are defined by climatological terciles, below normal meaning that the the year was dryer than 2/3 of all observed years in a climatological reference period.
+Therefore, we call these type of predictions tercile forecasts. 
+Typically, high emphasis is put on the 'most likely category', according to the prediction. For example, the typical probability maps show for each gridpoint only the probability of this category.
 
-Therefore, considering all three probabilities of the prediction allows for better forecast evaluation. This does not mean, however, that the communication of the prediction to the public needs to contain all three probabilities, which would likely be more confusing than helpful. In the next subsection we'll discuss how to evaluate a fully probability forecast (vector of three probabilities). In the section thereafter, we address the case where only the most likely category is known.
+From an evaluation perspective, however, it is preferable to not only consider the most likely category, but to evaluate the vector of three probabilities for all categories.
+This vector conveys more detailed information about the forecast: Say, for example, two competing models predicted the probabilities (0.5, 0.3, 0.2) and (0.5, 0.45, 0.05), respectively (in the order below, normal, high). Say now, after observing the predicted season, it turns out that the rainfall was in fact above normal. In this case, both predictions were pretty bad, but the first model at least assigned a 20% chance to above-normal-rainfall, whereas the second model only assigned a 5% chance to that outcome. So the first prediction was substantially better than the second. However, if evaluation focuses on the category with the highest predicted probability, the two models can't be distinguished: For both of them this category is 'below' with 50\% probability.
 
-### Proper scoring rules for full tercile forecasts {#eval-terciles}
+Therefore, considering all three probabilities of the prediction allows for better forecast evaluation. This does not mean, however, that the communication of the prediction to the public needs to contain all three probabilities, which would likely be more confusing than helpful. 
+In the next subsection we'll discuss how to evaluate a fully probability forecast (vector of three probabilities). 
+In some scenarios, however, only the highest probability category (and its assigned probability) are communicated and available for evaluation. In Section @ref{eval-terciles2} we briefly discuss how forecasts can be evaluated in this case.
 
-Proper scoring rules are tools for evaluating predictive performance. Given a prediction and the corresponding observation, a proper score returns a single number. We consider negatively oriented scores, that is, lower scores indicate better performance. Popular examples are the Brier Score, Mean Square Error (MSE), Log-likelihood score or the continuous ranked probability score (CRPS).
+Throughout this section we will work with the data example derived [here](#us-obs).
 
-When we're dealing with tercile forecasts of precipitation, we can use the *Multicategory Brier Score (MBS)*. It is defined as
-\[\text{MBS} :=  (p_1 - e_1)^2 + (p_2 - e_2)^2 + (p_3 - e_3)^2.\]
-Here, $p_1,p_2,$ and $p_3$ are the predicted probabilities for the three categories, and $e_i$ is 1 if the observation falls in the $i$th category, and 0 else. For example, if the observation falls into the first category, the MBS would be
-\[(p_1 - 1)^2 + p_2^2 + p_3^2.\]
+### Verification maps ###
 
-This score is strictly proper, meaning that it rewards calibration and accuracy. In our particular situation, the climatological forecast is uniform
-(since climatology is used to define the tercile categories), and the climatological forecast (1/3,1/3,1/3) always gets a MBS of 2/3. 
-It is therefore very convenient to consider the *Multicategory Brier Skill Score (MBSS)*
-\[MBSS := \frac{3}{2}(2/3 - \text{MBS}).\]
-Like other skill scores, this score is normalized in the sense that a perfect forecaster attains a skill score of 1 and a climatology forecast always gets a skill score of 0.
-Note that, for the MBSS, higher values indicate better performance, unlike for the MBS (similar as for other scores such as MSE).
+For getting a good idea whether a tercile forecast for a past season was good, it is a good idea to just plot the observation. And since we predict in the three categories below, normal and above, it makes sense to transform the observation to this scale and plot, where precipitation was unusual and how so. To this end we need to load more than one year of observation, in order to establish what constitutes normal rainfall for a location. This can be done by the function `ver_map`:
 
-Tercile forecasts are a particular situation where the skill score is a strictly proper scoring rule itself (albeit positively oriented). This means in particular that we may average Multicategory Brier Skill Scores accross different grid points without being concerned about different scales of precipitation.
-If, for example, the average MBSS of our prediction over all gridpoints in Ethiopia is above 0, our prediction for Ethiopia was on average better than climatology.
 
-Let's now look at a data example, contained in the `data_dir` specified [here](#netcdf_to_dt). The core function is simply called `MBSS_dt`. The main work is organizing the data in one data table of the correct format, which was done in Section \@ref(us-obs). In particular, recall that we can use the function `add_tercile_cat` to determine which observations are in the lower or upper climatology tercile.
+```r
+# get observations (example chirps dataset for December):
+dt_Dec = chirps_monthly[month == 12]
+
+ver_map(dt_Dec,o = 'prec')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-1-1.png" width="480" /><img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-1-2.png" width="480" />
+
+Here, the brown grid points show where precipitation was below normal, blue shows grid points with normal rainfall and green shows above normal rainfall, with darker brown/green indicating more extreme observations. The `ver_map` function by default considers all years available in the data table to calculate the reference climatology, and plots the verification map for the last available year. So the plot above is the verification map for December 2020. These defaults can of course be changed, see functiion documentation.
+
+## Scores for full tercile forecasts {#eval-terciles}
+
+By scores we mean any validation tool that returns a number. Typical examples are the ignorance score (or log-likelihood) or the ROC-score (or area under curve/AUC). Some scores such as the ignorance score directly indicate 'goodness' of the forecast in the sense that better forecasts achieve on average better scores. Such scores are called *proper*. Other scores, such as the ROC-score evaluate properties such as the resolution of the forecast, but are agnostic towards bias of the forecast. See the [WMO recommendations](https://library.wmo.int/doc_num.php?explnum_id=4886) for an overview of scores, their properties and how to use them.
+
+
+### Proper scores and proper skill scores 
+
+The ignorance score evaluates forecast performance, with lower values indicating better skill:
 
 
 ```r
@@ -307,15 +81,61 @@ print(dt)
 ```
 
 ```r
-# get Multicategory Brier Skill Score:
+# get the ignorance score
+igs = IGS(dt,
+          o = 'tercile_cat')
+ggplot_dt(igs,high = 'darkgreen',low = 'purple',discrete_cs = TRUE, mn = 'IGS for MAM tercile forecast 2021')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-2-1.png" width="480" />
+
+A common difficulty when considering proper scores is that the actual value of the score is difficult to interpret. For this purpose, scores are often transformed into *skill scores*. Skill scores indicate whether a forecast performed better or worse than a climatological forecast. A skill score of above zero indicates that the forecast has more skill than climatology. A skill score of 1 indicates a perfect forecast. For deriving the ignorance skill score we can simply call the `IGSS` function
+
+
+```r
+# get the ignorance score
+igss = IGSS(dt,
+            o = 'tercile_cat')
+ggplot_dt(igss,high = 'darkgreen',low = 'purple',discrete_cs = TRUE,midpoint = 0, binwidth = 0.2, mn = 'IGS for MAM tercile forecast 2021')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-3-1.png" width="480" />
+
+Green areas in the plot indicate locations where the tercile forecast performed better than climatology, purple worse. 
+
+A second score similar to the ignorance score is the *Multicategory Brier Score (MB)*. Its main advantage over the ignorance score is that it is less sensitive to outliers and always is finite (whereas the ignorance score is $\infty$ when a zero-probability event occurs).
+The MBS is defined as
+\[\text{MB} :=  (p_1 - e_1)^2 + (p_2 - e_2)^2 + (p_3 - e_3)^2.\]
+Here, $p_1,p_2,$ and $p_3$ are the predicted probabilities for the three categories, and $e_i$ is 1 if the observation falls in the $i$th category, and 0 else. For example, if the observation falls into the first category, the MB would be
+\[(p_1 - 1)^2 + p_2^2 + p_3^2.\]
+
+This score is strictly proper, meaning that it rewards calibration and accuracy. In our particular situation, the climatological forecast is uniform
+(since climatology is used to define the tercile categories), and the climatological forecast (1/3,1/3,1/3) always gets a MB of 2/3. 
+It is therefore very convenient to consider the *Multicategory Brier Skill Score (MBS)*
+\[MBS := \frac{3}{2}(2/3 - \text{MB}).\]
+Like other skill scores, this score is normalized in the sense that a perfect forecaster attains a skill score of 1 and a climatology forecast always gets a skill score of 0.
+Note that, for the MBS, higher values indicate better performance, unlike for the MB (similar as for other scores such as MSE).
+Since the MBS is just a linear transformation of the MB, but is way easier to interpret, there is not really a reason to ever calculate the MB, and `SeaVal` does not contain a separate function for that.
+For calculating the  MBS, we can call the function with the same name:
+
+
+```r
+# get Multicategory Brier Score:
 mbs = MBS(dt,
           o = 'tercile_cat')
 ggplot_dt(mbs,high = 'darkgreen',low = 'purple',discrete_cs = TRUE,binwidth = 0.2,midpoint = 0, mn = 'MBS for MAM tercile forecast 2021')
 ```
 
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-9-1.png" width="480" />
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-4-1.png" width="480" />
 
-Areas colored in green show where the prediction was better than climatology, areas colored in purple indicate worse performance. The MBSS indicates, for example, good forecast performance over most of Tanzania. 
+As we can see, there is a large amount of agreement between the IGSS and the MBS.
+
+
+
+
+
+
+
 
 To see whether the forecast was overall better than climatology, we average the MBS:
 
@@ -338,9 +158,8 @@ print(mean_mbs)
 ##  7:    Ethiopia -0.02526435
 ##  8:       Kenya -0.02616993
 ##  9:     Eritrea -0.02673488
-## 10:                     NaN
-## 11:     Somalia -0.01600070
-## 12:    Djibouti  0.03368777
+## 10:     Somalia -0.01600070
+## 11:    Djibouti  0.03368777
 ```
 
 Finally, let's check whether this makes sense, by comparing climatology to the prediction:
@@ -352,7 +171,7 @@ dt[,anomaly:= precip - clim]
 ggplot_dt(dt[year == 2021],'anomaly',high = 'blue',low = 'red',midpoint = 0, mn = 'observed 2021 MAM precip anomaly')
 ```
 
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-11-1.png" width="480" />
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-6-1.png" width="480" />
 
 ```r
 # or, as discrete plot:
@@ -369,7 +188,7 @@ pp4 = ggplot_dt(dt,'above',midpoint = 0.33,discrete_cs = TRUE,binwidth = 0.05,mn
 ggpubr::ggarrange(pp1,pp2,pp3,pp4,ncol = 4)
 ```
 
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-12-1.png" width="1920" />
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-7-1.png" width="1920" />
 As we can see, the season was very wet overall. The prediction was overall wet as well, especially over the western part of the considered region, where the prediction also got assigned a positive MBS.
 
 ### Evaluation when only the highest probability category is avaliable {#eval-terciles2}
@@ -488,7 +307,7 @@ ggarrange(p1,p2,p3,ncol = 3)
 ## shifted. Consider using geom_tile() instead.
 ```
 
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-14-1.png" width="1152" />
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-9-1.png" width="1152" />
 
 *In order to evaluate these forecast the high resolution CHIRPS-data of the past is missing!*
 
@@ -527,6 +346,250 @@ dt = netcdf_to_dt(paste0(data_dir,fn))
 ```r
 dt[,normal := normal/100][,above := above/100][,below := below/100]
 ```
+
+
+
+## Evaluating cross-validation predictions {#cv-eval}
+
+Here we evaluate the cross-validation data prepared in Section \@ref(cv-data).
+The data table contains observations for past years for the FMA season, along with 'best-guess'-predictions, meaning that they are single numbers, not probabilities:
+
+```r
+print(dt_cv)
+```
+
+```
+##         lon   lat prediction observation year month
+##     1: 20.5 -11.5  316.19452   369.36932 1982     2
+##     2: 20.5 -11.5  316.20178   252.47144 1983     2
+##     3: 20.5 -11.5  317.43375   267.44031 1984     2
+##     4: 20.5 -11.5  313.30789   332.10236 1985     2
+##     5: 20.5 -11.5  318.12195   343.65460 1986     2
+##    ---                                             
+## 79745: 51.5  22.5   25.44651    19.71902 2012     2
+## 79746: 51.5  22.5   25.59836    27.55773 2013     2
+## 79747: 51.5  22.5   26.03941    25.14965 2014     2
+## 79748: 51.5  22.5   26.03053    22.23634 2015     2
+## 79749: 51.5  22.5   26.00327    34.84376 2016     2
+```
+Such predictions are often called *point forecasts*, whereas forecasts specifying probabilities are called *probabilistic*. 
+We already have the data in the shape we want it to be, containing both predictions and observations as one column each. Let's have a look at the bias in our predictions:
+
+
+```r
+### check out local biases:
+bias_dt = dt_cv[,.(bias = mean(prediction - observation)), by = .(lon,lat)] # grouping by lon,lat, and season means that the mean is taken over all years.
+bias_dt[,range(bias)] # get an idea of the range for plotting
+```
+
+```
+## [1] -10.81321  13.11778
+```
+
+```r
+rr = c(-15,15) # fix range, to make plots comparable
+
+ ggplot_dt(bias_dt,
+           data_col = 'bias', 
+           rr = rr, # fix range to make it comparable to pp2
+           mn = 'bias of FMA prediction',
+           midpoint = 0)
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-12-1.png" width="480" />
+
+For evaluating the locally varying skill of these predictions we can calculate the average square error per location and compare it to the square error we would get by predicting local climatology, i.e., just the mean precipitation for that location. This is called the mean square error skill score (MSES) and is calculated by the function `MSES`.
+For fair comparison, the climatology needs to be calculated leave-one-year-out: For example, a climatological prediction for 2021 prediction would be the mean precipitation over all years *except 2021*. Otherwise, the climatological forecast uses information that would not be available in a prediction setting, which inflates the skill of the climatology forecast. 
+
+
+
+```r
+### analyze mean square error skill scores
+msess = MSES(dt_cv,
+             f = 'prediction', # column name of forecasts
+             o = 'observation', # column name of observations
+             by = c('lon','lat')) # the skill scores should be computed for each location separately
+
+# plot results:
+ggplot_dt(msess,
+          data_col = 'MSES', 
+          midpoint = 0, # center color scale, white is 0
+          mn = 'MSE skill score, FMA')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-13-1.png" width="480" />
+As for all skill scores, positive values indicate that the prediction has higher skill than climatology, negative values indicates lower skill. Skill scores are moreover 'standardized' such that a score of 1 corresponds to a perfect forecast. 
+Most evaluation functions in `SeaVal` require similar input as `MSES`:
+* `dt`: a data table containing both observations and predictions.
+* `f`,`o`: the column names of the predictions and observation.
+* `by`: the column names for dimension variables to group by.
+[Add more context here]
+Note that there is also a (faster) function `MSE` if we're not interested in skill scores, but simply want to compute MSEs. Both function can also handle ensemble predictions, see function documentation.
+If we want to analyze results by countries, we can use the function `add_country_names` that adds a column with country names to the data table:
+
+
+```r
+# check out average MSEs and MSESSs per country:
+msess = add_country_names(msess)
+print(msess)
+```
+
+```
+##        lon  lat       MSE  clim_MSE          MSES     country
+##    1: 24.5  8.5 166.01823 160.95057 -0.0314858375 South Sudan
+##    2: 25.0  8.0 157.70201 155.21241 -0.0160399415 South Sudan
+##    3: 25.0  8.5 184.12923 175.97631 -0.0463296523 South Sudan
+##    4: 25.5  7.5 318.41059 315.81470 -0.0082196638 South Sudan
+##    5: 25.5  8.0 189.80862 189.96845  0.0008413415 South Sudan
+##   ---                                                        
+## 1231: 48.5 11.0  68.40813  72.26785  0.0534084478     Somalia
+## 1232: 49.0  6.5 202.11711 216.18040  0.0650534734     Somalia
+## 1233: 49.0  7.0 153.96742 162.97361  0.0552616643     Somalia
+## 1234: 49.5 11.0  74.21040  76.48522  0.0297419712     Somalia
+## 1235: 50.0 11.0 181.27647 184.42122  0.0170519749     Somalia
+```
+
+```r
+msess_by_country = msess[,.(MSE = mean(MSE),
+                            MSES = mean(MSES)), by = country] # take averages by country
+
+print(msess_by_country)
+```
+
+```
+##         country       MSE         MSES
+##  1: South Sudan  622.6657  0.029073419
+##  2:      Rwanda 1695.8937  0.130467978
+##  3:    Tanzania 4011.6931  0.030148166
+##  4:     Burundi 2195.6404  0.109954193
+##  5:      Uganda 1369.9684  0.062205385
+##  6:    Ethiopia 1557.5682  0.068145290
+##  7:       Kenya 2173.5858  0.066719651
+##  8:       Sudan  216.8926 -0.021270474
+##  9:     Eritrea  393.7713  0.007646318
+## 10:     Somalia 1183.0632  0.040397831
+## 11:    Djibouti  121.1750  0.078021693
+```
+
+
+Skill scores strongly depend on the skill of the climatological prediction, see Section \@ref(eval-ex-pr). This makes it somewhat problematic to average them in space, as skill scores for different grid points with different climatologies have different meanings. A more appropriate way to see whether the prediction outperformed climatology on average for a given country is by considering average score differences:
+
+
+```r
+# positive values indicate better performance than climatology:
+msess[,.(score_diff = mean(clim_MSE - MSE)),by = country]
+```
+
+```
+##         country score_diff
+##  1: South Sudan  27.289033
+##  2:      Rwanda 283.252101
+##  3:    Tanzania  82.175135
+##  4:     Burundi 273.488506
+##  5:      Uganda  89.460627
+##  6:    Ethiopia 131.532177
+##  7:       Kenya 166.101084
+##  8:       Sudan  -4.517323
+##  9:     Eritrea  -5.201654
+## 10:     Somalia  58.001462
+## 11:    Djibouti  11.940107
+```
+
+The MSE (and its associated skill score) penalizes both systematic forecast errors (i.e. biases) and non-systematic forecast errors. The latter are a consequence of general forecast uncertainty and there is no easy way to reduce them. Biases, however, can often be removed through statistical post-processing, and it is therefore interesting to consider measures for forecast performance that penalize only non-systematic forecast errors, thus giving an idea of the *potential skill* of a forecast system.
+
+The standard metric to assess the *potential skill* is the *Pearson correlation coefficient (PCC)*. This is the usual correlation coefficient where forecasts and observations are standardized by their respective climatological means and standard deviations, and then the average product of these standardized variables is calculated. The function `PCC` performs these calculations and is used in the same way as `MSES` above.
+
+
+```r
+### calculate Pearson correlation coefficients
+pcc = PCC(dt_cv,
+          f = 'prediction', # column name of forecasts
+          o = 'observation', # column name of observations
+          by = c('lon','lat')) # the correlation coefficient should be computed for each location separately
+
+# the maximal range for a correlation coefficient is [-1,1], but sometimes it is useful to narrow it:
+rr = c(-0.75,0.75)
+
+ggplot_dt(pcc,
+          data_col = 'rho', 
+          rr=rr,
+          mn = 'Pearson correlation coefficient, FMA')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-16-1.png" width="480" />
+
+
+While there is no technical requirement that the forecasts and observations follow a particular probability distribution when the Pearson correlation coefficient is employed, this metric is best suited for continuous distributions (i.e. it is unlikely to encounter duplicate values) that are relatively symmetric around the mean. For shorter (e.g. weekly) accumulation periods and in dry climates, the distribution of precipitation usually becomes rather skewed and contains a number of zeros. A new metric, the coefficient of predictive ability (CPA), has recently been developed and constitutes an excellent alternative to the PCC as a measure of potential forecast skill in that situation of strongly asymmetric distributions with multiple identical values. See [here](MotivationCPA.pdf) for more background information about the CPA. The function `CPA` performs the calculations and is used in the same way as `MSES` and `PCC` above.
+
+
+```r
+### calculate coefficient of predictive ability
+cpa = CPA(dt_cv,
+          f = 'prediction', # column name of forecasts
+          o = 'observation', # column name of observations
+          by = c('lon','lat')) # the CPA should be computed for each location separately
+
+# the maximal range for the CPA is [0,1]
+# a value of 0.5 corresponds to no skill (more details can be found in the document under the link given above) 
+rr = c(0,1)
+
+ggplot_dt(cpa, 
+          data_col = 'cpa', 
+          rr=rr,
+          mn = 'Coefficient of predictive ability, FMA')
+```
+
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-17-1.png" width="480" />
+
+Just like the MSES, PCC and CPA can be averaged by country using the function `add_country_names`:
+
+
+```r
+# check out average PCCs and CPAs per country:
+pcc = add_country_names(pcc)
+cpa = add_country_names(cpa)
+
+pcc_by_country = pcc[,.(rho = mean(rho)), by = country]
+cpa_by_country = cpa[,.(cpa = mean(cpa)), by = country]
+
+print(pcc_by_country)
+```
+
+```
+##         country          rho
+##  1: South Sudan -0.131322590
+##  2:      Rwanda  0.304516201
+##  3:    Tanzania -0.102200872
+##  4:     Burundi  0.230229774
+##  5:      Uganda  0.087081218
+##  6:    Ethiopia  0.068491179
+##  7:       Kenya  0.100172850
+##  8:       Sudan -0.328970736
+##  9:     Eritrea -0.169954159
+## 10:     Somalia  0.003777202
+## 11:    Djibouti  0.194408707
+```
+
+```r
+print(cpa_by_country)
+```
+
+```
+##         country       cpa
+##  1: South Sudan 0.4362882
+##  2:      Rwanda 0.6468312
+##  3:    Tanzania 0.4564792
+##  4:     Burundi 0.6117025
+##  5:      Uganda 0.5372199
+##  6:    Ethiopia 0.5428733
+##  7:       Kenya 0.5474916
+##  8:       Sudan 0.3812325
+##  9:     Eritrea 0.4131719
+## 10:     Somalia 0.5254189
+## 11:    Djibouti 0.6097689
+```
+
+
 
 ## Exceedence probabilities {#eval-ex-pr}
 
@@ -688,4 +751,4 @@ for(leadtime in 1:3)
 do.call('ggarrange', c(plot_list,ncol = 5,nrow = 3,common.legend = TRUE,legend = 'bottom'))
 ```
 
-<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-21-1.png" width="960" />
+<img src="05-Seasonal_validation_files/figure-html/unnamed-chunk-24-1.png" width="960" />
